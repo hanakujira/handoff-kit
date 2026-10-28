@@ -1,0 +1,41 @@
+{
+  "note": "kind table for handoff.ps1. Two passes: `lead` = marker at the start of the entry (strongest signal), `any` = keyword anywhere (fallback). First match wins in both passes.",
+  "kinds": [
+    {
+      "key": "blocker",
+      "label": "BLOCKED / 卡住",
+      "lead": "^[\\s\\W]{0,4}(?:🛑|⛔|❌|🚫)",
+      "any":  "🛑|⛔|❌|🚫"
+    },
+    {
+      "key": "pitfall",
+      "label": "PITFALLS / 踩過的坑",
+      "lead": "^[\\s\\W]{0,4}(?:🐛|🪤|⚠)",
+      "any":  "🐛|🪤|⚠️|⚠|踩坑|踩到"
+    },
+    {
+      "key": "todo",
+      "label": "TODO / 待決定",
+      "lead": "^[\\s\\W]{0,4}(?:⏭|⏳|📌|☐|📝)",
+      "any":  "⏭|⏳|📌|☐|待確認|待決定|等人|下一步|待回"
+    },
+    {
+      "key": "done",
+      "label": "DONE / 已完成",
+      "lead": "^[\\s\\W]{0,4}(?:✔|✅|🏁|☑)",
+      "any":  "✔|✅|🏁|完成|修好|搞定"
+    },
+    {
+      "key": "insight",
+      "label": "INSIGHT / 判斷",
+      "lead": "^[\\s\\W]{0,4}(?:🧠|💡|🔎|💬)",
+      "any":  "🧠|💡|🔎|💬|結論|判斷"
+    },
+    {
+      "key": "meta",
+      "label": "META / 環境",
+      "lead": "^[\\s\\W]{0,4}(?:🌙|🕗|🎭|🔧)",
+      "any":  "🌙|🕗|🎭|時區|系統事實"
+    }
+  ]
+}
