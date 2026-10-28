@@ -1,103 +1,111 @@
 # handoff-kit (MVP)
 
-> **你的 AI 每次換對話就忘光;這個把一天的亂日誌壓成一頁交接稿。**
+> **Your AI forgets everything between conversations. This squeezes a messy day of work into a one-page handoff note.**
 
-把一份又長又亂的工作紀錄,壓成一頁交接稿。
+Give it a long, noisy work log; get a one-page handoff back.
 
-## 為什麼
+[中文版說明](README.zh-TW.md)
 
-agent 專案幾乎都死在這裡:context 一滿就要交接,而交接稿是**手寫**的。一天寫掉一萬字。
-寫的人累,讀的人(下一個 session 的自己)也累,而且欄位每次都不一樣。
+## Why
 
-## 它做什麼
+Almost every agent project dies at the same spot: the context fills up, so you have to hand off — and the handoff note is **hand-written**. A day of it runs to ten thousand words.
+It is tiring to write, tiring to read (the next session's you), and the fields are different every time.
 
-輸入一份 markdown 紀錄(會議記錄、agent 執行筆記、開發日誌都行),
-輸出六個區塊的交接稿:
+## What it does
 
-| 區塊 | 從哪來 |
+Input: a markdown log (meeting notes, agent run notes, a dev diary — anything bullet-shaped).
+Output: a handoff note with six blocks.
+
+| Block | Comes from |
 |---|---|
-| BLOCKED / 卡住 | 以 🛑 ⛔ ❌ 🚫 開頭的條目 |
-| PITFALLS / 踩過的坑 | 🐛 🪤 ⚠ |
-| TODO / 待決定 | ⏭ ⏳ 📌 ☐,或內文含「待確認/待決定/等人/下一步」 |
-| DONE / 已完成 | ✔ ✅ 🏁 |
-| INSIGHT / 判斷 | 🧠 💡 🔎 💬 |
-| META / 環境 | 🌙 🕗 🎭 |
+| BLOCKED | entries starting with 🛑 ⛔ ❌ 🚫 |
+| PITFALLS | 🐛 🪤 ⚠ |
+| TODO | ⏭ ⏳ 📌 ☐, or entries whose text contains a to-do keyword |
+| DONE | ✔ ✅ 🏁 |
+| INSIGHT | 🧠 💡 🔎 💬 |
+| META | 🌙 🕗 🎭 |
 
-規則(弱到強,依序):
-1. 條目自己的**行首標記**(強訊號):🛑 ⛔ ❌、🐛 🪤 ⚠、⏭ ⏳ 📌 ☐、✔ ✅ 🏁、🧠 💡 🔎 💬、🌙 🕗 🎭
-2. 條目自己的**內文關鍵字**(弱訊號):待確認、待決定、等人、完成、修好、結論…
-3. **所屬標題**——只在標題**開頭**就是標記時才算(「✅ 已經通了的事」算,「14:03 安裝完成」不算:中間出現「完成」是敘述,不是結論)
-4. 三個都沒中 → 收進最後一段 **UNCLASSIFIED / 未分類**,**不丟**
+Classification runs from weak to strong:
 
-其他:去重、保留每區最新 N 條、`--since` 可用「條目上的日期」或「所屬標題上的日期」。
+1. The entry's own **leading marker** (strong signal): 🛑 ⛔ ❌, 🐛 🪤 ⚠, ⏭ ⏳ 📌 ☐, ✔ ✅ 🏁, 🧠 💡 🔎 💬, 🌙 🕗 🎭
+2. The entry's own **body keywords** (weak signal), from `rules.json`.
+3. Its **heading** — only when the heading *starts* with a marker (`✅ What now works` counts; `14:03 install finished` does not: a mention of "finished" mid-sentence is narration, not a conclusion).
+4. Nothing matched → the entry lands in a final **UNCLASSIFIED** block. **It is never dropped.**
 
-## 結構
+Also: de-duplication, keep the newest N per block, and `--since` that accepts either the date on an entry or the date on its heading.
+
+## Layout
 
 ```
-handoff.mjs          CLI:解析參數、挑 adapter、印或寫檔
-core.mjs             draft(entries, opts) → 交接稿。不知道輸入是 md 還是 jsonl
-adapters/markdown.mjs  條列式 markdown → Entry[]
-adapters/jsonl.mjs     (骨架,throw not implemented)
-handoff.ps1          PowerShell 薄殼,轉呼叫 handoff.mjs
+handoff.mjs             CLI: parse args, pick an adapter, print or write
+core.mjs                draft(entries, opts) -> handoff. Does not care if the input was md or jsonl
+adapters/markdown.mjs   bullet markdown -> Entry[]
+adapters/jsonl.mjs      (skeleton, throws "not implemented")
+handoff.ps1             thin PowerShell wrapper that calls handoff.mjs
 ```
 
-`Entry = { text: string, extra: string[], heading?: string, date?: string }` —— core 只認這個形狀。
-`heading` 是每個條目上方最近的 `##`/`###` 標題,`date` 是往上找到的最近 `YYYY-MM-DD`;兩個都是選填,沒有就當沒有。
+`Entry = { text: string, extra: string[], heading?: string, date?: string }` — core understands only this shape.
+`heading` is the nearest `##`/`###` above the entry, `date` is the nearest `YYYY-MM-DD` found going upwards; both optional.
 
-## 用法
+## Usage
 
 ```powershell
-# Node 版
+# Node
 node handoff.mjs worklog.md --out handoff.md --per 12
-node handoff.mjs worklog.md --from jsonl          # 目前會 throw:還沒實作
+node handoff.mjs worklog.md --from jsonl          # throws for now: not implemented yet
 
-# PowerShell 版(薄殼,轉呼叫 handoff.mjs)
+# PowerShell (thin wrapper around handoff.mjs)
 powershell -NoProfile -ExecutionPolicy Bypass -File handoff.ps1 `
   -Path worklog.md -Out handoff.md -Per 12
 ```
 
-- `-Path` / 位置參數:輸入檔(必填)
-- `--out` / `-Out`:輸出檔,不給就印到畫面
-- `--per` / `-Per`:每區保留幾條,不給就用 core 的預設 25
-- `--since` / `-Since`:只收這天之後的條目
-- `--from` / `-From`:`md`(預設)或 `jsonl`
+- `-Path` / positional: input file (required)
+- `--out` / `-Out`: output file; omit to print to stdout
+- `--per` / `-Per`: how many entries to keep per block (default 25)
+- `--since` / `-Since`: only entries from this day onward
+- `--from` / `-From`: `md` (default) or `jsonl`
 
-⚠ 直接 `& .\handoff.ps1` 會被擋(「未數位簽章」)。要從外面叫:
+⚠ Calling `& .\handoff.ps1` directly is blocked by the default execution policy ("not digitally signed"). From the outside:
+
 `powershell -NoProfile -ExecutionPolicy Bypass -File .\handoff.ps1 -Path ... -Out ...`
 
-## 範例(真的跑出來的)
+## Example (actually generated)
 
-`examples/sample-log.md`(25 行雜亂日誌)→ `examples/sample-handoff.md`(六區 + 未分類,14 classified + 3 unclassified)。
+`examples/sample-log.md` (25 messy lines) → `examples/sample-handoff.md` (six blocks + unclassified: 14 classified, 3 unclassified). Both examples are in Chinese.
 
-那 25 行裡有 3 行沒標記(「吃午餐」這種),它們**沒有被丟掉**,而是收進最後一段「未分類」等你掃一眼。
-這就是它的取捨:**它不判斷內容重不重要,只看你有沒有標。** 所以寫日誌時多花兩秒打個 ✅ 或 🐛,交接稿就準兩倍。
+Three of those 25 lines carry no marker ("had lunch"). They are **not discarded** — they land in the final "unclassified" block for you to glance at.
 
-## 怎麼加一個 adapter
+That is the trade-off this tool makes: **it does not judge what matters, only whether you marked it.** Spend two extra seconds typing a ✅ or a 🐛 while you write, and the handoff gets twice as accurate.
 
-1. 在 `adapters/` 開一個檔,export `loadEntries(path)`。
-2. 回傳 `{ entries: [{ text, extra }], lineCount }`;`text` 是一條紀錄,`extra` 是它底下的續行。
-3. 在 `handoff.mjs` 的 `FORMATS` 加一筆 `['<cli 名>', '<模組名>']`。
-4. 跑一次,跟舊格式的輸出比對(除了 `generated:` 那行要逐字相同)。
+## Adding an adapter
 
-core 不用動,分類、去重、`--since`、渲染都留給它。
+1. Create a file in `adapters/` exporting `loadEntries(path)`.
+2. Return `{ entries: [{ text, extra }], lineCount }` — `text` is one record, `extra` is its continuation lines.
+3. Add an entry `['<cli name>', '<module name>']` to `FORMATS` in `handoff.mjs`.
+4. Run it and diff against the previous format's output (everything except the `generated:` line should match byte for byte).
 
-## 實測(2026-10-26)
+Core stays untouched: classification, de-duplication, `--since` and rendering all live there.
 
-一份真實的 agent 日誌(1,449 行 / 11.7 萬字) → **100 行 / 7,331 字**(約 16 倍壓縮)。
-1,018 個條目裡認出 160 個,其餘 858 個沒有標記 → 丟掉。
+## Measured (2026-10-26)
 
-## 已知限制
+A real agent log (1,449 lines / ~117k characters) → **100 lines / 7,331 characters** (about 16× compression).
+Of 1,018 entries, 160 were recognised; the other 858 had no markers and were dropped.
 
-- 只認條列式(`- ` / `* ` / `1. `)。散文段落不處理。
-- 分類靠標記與關鍵字,**不理解語意**。判斷品質取決於寫日誌的人有沒有好好標。
-- 標題後備分類只看**標題開頭**的標記;標題中間提到「完成」「結論」不會影響底下條目(刻意的,否則「安裝完成 + 現況」會把整段吃成 DONE)。
-- `rules.json` 目前**沒有任何程式在讀**:舊的 PowerShell 版會讀它,現在 PowerShell 只剩薄殼。
-  要拿回來就讓 `core.mjs` 吃它(改分類表),但那會動到既有輸出,另開一次改。
-- `handoff.ps1` 不綁死任何路徑,它依序找:`$env:HANDOFF_NODE` → PATH 上的 `node` → `$env:HANDOFF_ELECTRON`(Electron 版 runtime,會用 `ELECTRON_RUN_AS_NODE=1` 跑)。
+## Known limits
 
-## 還沒做(Roadmap)
+- Bullet lists only (`- ` / `* ` / `1. `). Prose paragraphs are ignored.
+- Classification is markers and keywords; **it does not understand meaning**. Quality depends on how well the log was marked up.
+- The heading fallback only looks at the **start** of a heading; "finished" or "conclusion" in the middle of a heading does not affect its entries. (Deliberate: otherwise a heading like "install finished + status" would swallow the whole section into DONE.)
+- `rules.json` is currently **read by nothing**: the old PowerShell implementation used it, and PowerShell is now only a wrapper. Feeding it back into `core.mjs` is possible, but that changes existing output, so it is a separate change.
+- `handoff.ps1` hardcodes no paths. It looks for, in order: `$env:HANDOFF_NODE` → `node` on PATH → `$env:HANDOFF_ELECTRON` (an Electron runtime, run with `ELECTRON_RUN_AS_NODE=1`).
 
-- 時間窗(不只 `--since`),以及「只輸出 BLOCKED + TODO」的精簡模式。
-- 開頭自動產生三行「如果你只有 30 秒」摘要。
-- 吃 JSONL(agent 的原始事件流),不只 markdown —— 這樣就不必先人工補標記。
-- 讓分類表從 `rules.json` 讀,而不是寫在程式裡。
+## Roadmap
+
+- Time windows (not just `--since`), and a `BLOCKED + TODO only` mode.
+- An auto-generated three-line "if you only have 30 seconds" summary at the top.
+- Ingest JSONL (an agent's raw event stream) instead of hand-marked markdown.
+- Read the classification table from `rules.json` instead of having it in code.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
